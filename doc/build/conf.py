@@ -171,7 +171,7 @@ copyright = u"2007-2021, the SQLAlchemy authors and contributors"  # noqa
 # The short X.Y version.
 version = "1.3"
 # The full version, including alpha/beta/rc tags.
-release = "1.3.24"
+release = "1.3.24+jrr1"
 
 release_date = "March 30, 2021"
 

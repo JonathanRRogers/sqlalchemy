@@ -572,8 +572,6 @@ class AssociationProxyInstance(object):
             )
             target = getattr(obj, self.target_collection)
             if target is None:
-                if values is None:
-                    return
                 setattr(obj, self.target_collection, creator(values))
             else:
                 self._scalar_set(target, values)
