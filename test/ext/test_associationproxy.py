@@ -1068,6 +1068,64 @@ class ScalarTest(fixtures.TestBase):
         p2 = Parent("p2")
         p2.bar = "quux"
 
+    def test_scalar_opts_exclusive(self):
+        with expect_raises_message(
+            exc.ArgumentError,
+            "The cascade_scalar_deletes and create_on_none_assignment "
+            "parameters are mutually exclusive.",
+        ):
+            association_proxy(
+                "a",
+                "b",
+                cascade_scalar_deletes=True,
+                create_on_none_assignment=True,
+            )
+
+    @testing.variation("create_on_none", [True, False])
+    @testing.variation("specify_creator", [True, False])
+    def test_create_on_set_none(
+        self, create_on_none, specify_creator, decl_base
+    ):
+        class A(decl_base):
+            __tablename__ = "a"
+            id = mapped_column(Integer, primary_key=True)
+            b_id = mapped_column(ForeignKey("b.id"))
+            b = relationship("B")
+
+            if specify_creator:
+                b_data = association_proxy(
+                    "b",
+                    "data",
+                    create_on_none_assignment=bool(create_on_none),
+                    creator=lambda data: B(data=data),
+                )
+            else:
+                b_data = association_proxy(
+                    "b", "data", create_on_none_assignment=bool(create_on_none)
+                )
+
+        class B(decl_base):
+            __tablename__ = "b"
+            id = mapped_column(Integer, primary_key=True)
+            data = mapped_column(String)
+
+            def __init__(self, data=None):
+                self.data = data
+
+        a1 = A()
+        is_none(a1.b)
+        a1.b_data = None
+
+        if create_on_none:
+            is_not_none(a1.b)
+        else:
+            is_none(a1.b)
+
+        a1.b_data = "data"
+
+        a1.b_data = None
+        is_not_none(a1.b)
+
     @testing.provide_metadata
     def test_empty_scalars(self):
         metadata = self.metadata
@@ -2651,6 +2709,7 @@ class ScalarRemoveTest(object):
     useobject = None
     cascade_scalar_deletes = None
     uselist = None
+    create_on_none_assignment = False
 
     @classmethod
     def setup_classes(cls):
@@ -2665,6 +2724,7 @@ class ScalarRemoveTest(object):
                 "b",
                 creator=lambda b: AB(b=b),
                 cascade_scalar_deletes=cls.cascade_scalar_deletes,
+                create_on_none_assignment=cls.create_on_none_assignment,
             )
 
         if cls.useobject:
@@ -2733,7 +2793,12 @@ class ScalarRemoveTest(object):
 
         a1.b = None
 
-        assert a1.ab is None
+        if self.create_on_none_assignment:
+            assert isinstance(a1.ab, AB)
+            assert a1.ab is not None
+            eq_(a1.ab.b, None)
+        else:
+            assert a1.ab is None
 
     def test_del_already_nonpresent(self):
         if self.useobject:
@@ -2872,6 +2937,12 @@ class ScalarRemoveScalarObjectNoCascade(
     uselist = False
 
 
+class ScalarRemoveScalarObjectNoCascadeNoneAssign(
+    ScalarRemoveScalarObjectNoCascade
+):
+    create_on_none_assignment = True
+
+
 class ScalarRemoveListScalarNoCascade(
     ScalarRemoveTest, fixtures.DeclarativeMappedTest
 ):
@@ -2879,6 +2950,12 @@ class ScalarRemoveListScalarNoCascade(
     useobject = False
     cascade_scalar_deletes = False
     uselist = True
+
+
+class ScalarRemoveListScalarNoCascadeNoneAssign(
+    ScalarRemoveScalarObjectNoCascade
+):
+    create_on_none_assignment = True
 
 
 class ScalarRemoveScalarScalarNoCascade(

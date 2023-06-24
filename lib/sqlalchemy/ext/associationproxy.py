@@ -106,6 +106,7 @@ class AssociationProxy(interfaces.InspectionAttrInfo):
         proxy_bulk_set=None,
         info=None,
         cascade_scalar_deletes=False,
+        create_on_none_assignment=False,
     ):
         """Construct a new :class:`.AssociationProxy`.
 
@@ -175,7 +176,14 @@ class AssociationProxy(interfaces.InspectionAttrInfo):
         self.getset_factory = getset_factory
         self.proxy_factory = proxy_factory
         self.proxy_bulk_set = proxy_bulk_set
+
+        if cascade_scalar_deletes and create_on_none_assignment:
+            raise exc.ArgumentError(
+                "The cascade_scalar_deletes and create_on_none_assignment "
+                "parameters are mutually exclusive."
+            )
         self.cascade_scalar_deletes = cascade_scalar_deletes
+        self.create_on_none_assignment = create_on_none_assignment
 
         self.key = "_%s_%s_%s" % (
             type(self).__name__,
@@ -572,6 +580,11 @@ class AssociationProxyInstance(object):
             )
             target = getattr(obj, self.target_collection)
             if target is None:
+                if (
+                    values is None
+                    and not self.parent.create_on_none_assignment
+                ):
+                    return
                 setattr(obj, self.target_collection, creator(values))
             else:
                 self._scalar_set(target, values)
